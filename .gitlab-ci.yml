@@ -1,0 +1,56 @@
+image: docker:stable
+
+services:
+    - docker:18.09.7-dind
+
+variables:
+    CONTAINER_IMAGE: registry.gitlab.com/$CI_PROJECT_PATH
+
+stages:
+    - build
+    - test
+    - build_and_push
+    - deploy_package
+
+build:
+    stage: build
+    script:
+        - "docker build \
+        -t $CONTAINER_IMAGE:$CI_COMMIT_SHA \
+        -t $CONTAINER_IMAGE:latest \
+        . \
+    "
+
+test:
+    stage: test
+    image: python:3.7
+    script:
+        - "python setup.py install"
+        - "pip install -r reqs/test.txt"
+        - "python setup.py test"
+
+
+build_and_push:
+    stage: build_and_push
+    only:
+        - master
+    script:
+        - "docker build \
+        -t $CONTAINER_IMAGE:$CI_COMMIT_SHA \
+        -t $CONTAINER_IMAGE:latest \
+        . \
+    "
+        - "docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com"
+        - "docker push $CONTAINER_IMAGE:$CI_COMMIT_SHA"
+        - "docker push $CONTAINER_IMAGE:latest"
+
+
+deploy_package:
+    image: python:3.7
+    stage: deploy_package
+    only:
+        - tags
+        - master
+    script:
+        - "python setup.py sdist bdist_wheel"
+        - "echo skipping this, TODO: upload wheel to s3"
